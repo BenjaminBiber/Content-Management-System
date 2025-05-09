@@ -1,0 +1,144 @@
+@using CMS.Services
+@using LibGit2Sharp
+@inject ISnackbar SnackBar
+@using Microsoft.Maui.Storage;
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <div class="row">
+            <div class="col-sm-9">
+                <MudTextField T="string" @bind-Value="albumItem.name" Label="Albumtitel"></MudTextField>
+            </div>
+            <div class="col-sm-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" OnClick="DeleteAlbum"></MudIconButton>
+            </div>
+            <div class="d-flex justify-content-end align-items-center col-sm-2 pl-5">
+                <MudIconButton Variant="Variant.Filled" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="PickAndSaveMultipleFilesAsync"></MudIconButton>
+            </div>
+        </div>
+      
+        <div class="mt-5">
+            @if(albumItem.pictures == null || albumItem.pictures.Length == 0)
+            {
+                <p>Keine Bilder vorhanden</p>
+            }
+            else
+            {
+                @foreach (var picture in albumItem.pictures)
+                {
+                <PhotoComponent IsBest="picture.isBest" Album="albumItem" RepoPath="@picture.url"></PhotoComponent>
+                }            
+            }
+            
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAlbum">Änderung speichern</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public AlbumItem Album { get; set; }
+    private AlbumItem albumItem = new AlbumItem();
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    protected override void OnInitialized()
+    {
+        albumItem = JsonService.DeepCopy(Album);
+    }
+    
+    public async Task<List<string>> PickAndSaveMultipleFilesAsync()
+    {
+        var savedFiles = new List<string>();
+
+        try
+        {
+            var results = await FilePicker.PickMultipleAsync(new PickOptions
+            {
+                PickerTitle = "Bilder auswählen",
+                FileTypes = FilePickerFileType.Images
+            });
+            if (results != null)
+            {
+                foreach (var file in results)
+                {
+                    var fileName = Path.GetFileName(file.FileName);
+                    var targetPath = Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "images", fileName);
+
+                    using var input = await file.OpenReadAsync();
+                    using var output = File.Create(targetPath);
+                    await input.CopyToAsync(output);
+
+                    savedFiles.Add(targetPath);
+                    var newPicture = new ImageItem()
+                    {
+                        url = Path.Combine("images", fileName)
+                    };
+                    if(albumItem.pictures == null || albumItem.pictures.Length == 0)
+                    {
+                        albumItem.pictures = new ImageItem[] { newPicture };
+                    }
+                    else
+                    {
+                        albumItem.pictures = albumItem.pictures.Append(newPicture).ToArray();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SnackBar.Add($"Fehler beim Speichern der Dateien: {ex.Message}", Severity.Error);
+        }
+
+        JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "data", "alben.json"), Album, albumItem);
+        return savedFiles;
+    }
+    
+    private async Task DeleteAlbum()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<GenericDialog> { { x => x.Text, "Willst du das Album wirklich Löschen? Es kann nicht mehr hergestellt werden." }, {x => x.Header, "Löschen"}, {x => x.ButtonText, "Löschen"}, {x => x.CancelText, "Abbrechen"} };
+
+        var dialog = await DialogService.ShowAsync<GenericDialog>("",parameters, options);
+        var result = await dialog.Result;
+
+        if(!result.Canceled)
+        {
+            RemoveAlbum();
+        }
+    }
+
+    private async Task SubmitAlbum()
+    {
+        var albums = JsonService.GetItems<AlbumItem[]>(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "alben.json")).ToList();
+        if(albums.Any(x => x.name.Trim().ToLower() == albumItem.name.Trim().ToLower()))
+        {
+            SnackBar.Add("Album existiert bereits", Severity.Error);
+            return;
+        }
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<GenericDialog> { { x => x.Text, "Willst du das Album wirklich speichern?" }, {x => x.Header, "Speichern"}, {x => x.ButtonText, "Speichern"}, {x => x.CancelText, "Abbrechen"} };
+
+        var dialog = await DialogService.ShowAsync<GenericDialog>("",parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "data", "alben.json"), Album, albumItem);
+            Submit();
+        }
+    }
+    
+    private void RemoveAlbum()
+    {
+        var path = Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "data", "alben.json");
+        JsonService.RemoveItem(path, Album);
+        Submit();
+    }
+}

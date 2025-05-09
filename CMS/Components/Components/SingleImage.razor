@@ -1,0 +1,79 @@
+@using CMS.Services
+@inject ISnackbar SnackBar
+@inject IDialogService DialogService
+
+<div class="container mb-3">
+    <div class="row">
+        <div class="col-sm-2">
+            <img src="@base64Image" alt="img" class="mw-100" style="object-fit: contain;" />
+        </div>
+        <div class="col d-flex justify-content-center align-items-center">
+            <MudField>@imageItem.description</MudField>
+        </div>
+        <div class="col-sm-1 d-flex justify-center align-items-center">
+            <MudIconButton Icon="@Icons.Material.Filled.Upload" OnClick="PickAndSaveFilesAsync" Color="Color.Primary"></MudIconButton>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public SingleImageItem Image { get; set; }
+    [Parameter] public EventCallback LoadData { get; set; }
+    private SingleImageItem imageItem = new SingleImageItem();
+    private string? base64Image;
+
+    protected override async Task OnInitializedAsync()
+    {
+        imageItem = JsonService.DeepCopy(Image);
+        
+        var path = Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", imageItem.url);
+        if (File.Exists(path))
+        {
+            var bytes = await File.ReadAllBytesAsync(path);
+            var base64 = Convert.ToBase64String(bytes);
+            base64Image = $"data:image/jpeg;base64,{base64}";
+        }
+    }
+
+    public async Task PickAndSaveFilesAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<GenericDialog> { { x => x.Text, "Willst du das Bild wirklich ändern? Es kann nicht mehr hergestellt werden." }, {x => x.Header, "Ändern"}, {x => x.ButtonText, "Ändern"}, {x => x.CancelText, "Abbrechen"} };
+
+        var dialog = await DialogService.ShowAsync<GenericDialog>("",parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled)
+        {
+            return;
+        }
+
+        try
+        {
+            var results = await FilePicker.PickAsync(new PickOptions
+            {
+                PickerTitle = "Bild auswählen",
+                FileTypes = FilePickerFileType.Images
+            });
+            if (results != null)
+            {
+                    var fileName = Path.GetFileName(results.FileName);
+                    var targetPath = Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "images", fileName);
+
+                    using var input = await results.OpenReadAsync();
+                    using var output = File.Create(targetPath);
+                    await input.CopyToAsync(output);
+                    var url = Path.Combine("images", fileName);
+                    imageItem.url = url;
+            }
+        }
+        catch (Exception ex)
+        {
+            SnackBar.Add($"Fehler beim Speichern der Dateien: {ex.Message}", Severity.Error);
+        }
+
+        JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory,"Repo", "public", "data", "images.json"), Image, imageItem);
+        await LoadData.InvokeAsync();
+        StateHasChanged();
+    }
+}   

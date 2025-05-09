@@ -1,0 +1,60 @@
+@using CMS.Services
+@using LibGit2Sharp
+@inject ISnackbar SnackBar
+@inject GitService GitService
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="repoUrl" T="string" Placeholder="Github-Repo Url"></MudTextField>
+        <MudTextField @bind-Value="token" T="string" Placeholder="Github-Token"></MudTextField>
+        <MudTextField @bind-Value="username" T="string" Placeholder="Github-Username"></MudTextField>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitUrl">Url Prüfen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    private string repoUrl = string.Empty;
+    private string token = string.Empty;
+    private string username = string.Empty;
+
+    private void SubmitUrl()
+    {
+        if (CanCloneRepo() && !string.IsNullOrEmpty(repoUrl) && !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(username))
+        {
+            SettingService.SetGitUrl(repoUrl, token, username);
+            GitService.CloneRepo();
+            SnackBar.Add("Repository erfolgreich geklont!", Severity.Success);
+            Submit();
+        }
+    }
+    
+    public bool CanCloneRepo()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+
+        try
+        {
+            Repository.Clone(repoUrl, tempPath, new CloneOptions
+            {
+                Checkout = false 
+            });
+
+            SnackBar.Add("Repository kann erfolgreich geklont werden!", Severity.Success);
+            return true;
+        }
+        catch (LibGit2SharpException ex)
+        {
+            SnackBar.Add($"Fehler beim Klonen: {ex.Message}", Severity.Error);
+            return false;
+        }
+    }
+}

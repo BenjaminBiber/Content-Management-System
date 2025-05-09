@@ -58,11 +58,15 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="bootstrap" Version="5.3.5" />
         <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
+        <PackageReference Include="Microsoft.Alm.Authentication" Version="4.3.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0"/>
+        <PackageReference Include="MudBlazor" Version="8.5.1" />
+        <PackageReference Include="MudBlazor.ThemeManager" Version="3.0.0" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     </ItemGroup>
 

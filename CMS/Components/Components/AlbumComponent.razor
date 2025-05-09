@@ -1,0 +1,45 @@
+@using CMS.Services
+@inject IDialogService DialogService
+
+<div class="mt-5 pt-4" style="width: 10em; height: 15em; display: flex; flex-direction: column;justify-content: center; align-items: center; gap: 2em; position: relative;border-radius: 0.5em; border: 2px solid var(--mud-palette-primary)">
+    @if (base64Image != null)
+    {
+    <img src="@base64Image" style="max-width: 80%; object-fit: contain;" />
+    }
+    <p>@Album.name</p>
+    <MudIconButton Color="Color.Secondary" Style="position: absolute; top: 0.1em; right: 0.1em" Icon="@Icons.Material.Filled.Edit" OnClick="OpenEditDialog"></MudIconButton>
+</div>
+
+@code {
+    [Parameter]
+    public AlbumItem Album { get; set; } = new AlbumItem();
+    [Parameter] public EventCallback OnLoadData { get; set; }
+
+    private string? base64Image;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var path = string.Empty;
+        if(Album.pictures != null)
+        {
+            path = Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", Album.pictures.FirstOrDefault().url);
+        }
+
+        if (File.Exists(path))
+        {
+            var bytes = await File.ReadAllBytesAsync(path);
+            var base64 = Convert.ToBase64String(bytes);
+            base64Image = $"data:image/jpeg;base64,{base64}";
+        }
+    }
+    
+    private async Task OpenEditDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = true, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true};
+        var parameters = new DialogParameters<EditAlbumDialog> { { x => x.Album, Album } };
+
+        var dialog = await DialogService.ShowAsync<EditAlbumDialog>("Album editieren",parameters, options);
+        var result = await dialog.Result;
+        await OnLoadData.InvokeAsync();
+    }
+}

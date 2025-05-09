@@ -1,0 +1,95 @@
+@using CMS.Services
+@inject IDialogService DialogService
+@inject ISnackbar SnackBar
+
+<div class="row mw-100">
+    <div class="col-sm-2 p-2">
+        <img style="object-fit: contain; width: 100%; height: auto" src="@base64Image" alt="img" />
+    </div>
+    <div class="col-sm-5 d-flex align-items-center pl-5">
+        <p>@(String.IsNullOrEmpty(Album.pictures.Where(x => x.url == RepoPath).FirstOrDefault().title) ? "--" : Album.pictures.Where(x => x.url == RepoPath).FirstOrDefault().title)</p>
+    </div>
+    <div class="col-sm-3 d-flex align-items-center justify-content-center">
+        <MudCheckBox T="bool" @bind-Value="IsBest" Label="is Best" Disabled="true" Color="Color.Primary"></MudCheckBox>
+    </div>
+    <div class="col-sm-1 d-flex align-items-center justify-content-center">
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" OnClick="DeletePic"></MudIconButton>
+    </div>
+    <div class="col-sm-1 d-flex align-items-center justify-content-center">
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="EditPic" Color="Color.Primary"></MudIconButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string RepoPath { get; set; } = "";
+    [Parameter] public bool IsBest { get; set; } = false;
+    [Parameter] public AlbumItem Album { get; set; }
+    private string base64Image = "";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await GetPicture();
+    }
+
+    private async Task GetPicture()
+    {
+        var path = Path.Combine(FileSystem.AppDataDirectory,"Repo","public", RepoPath);
+
+        if (File.Exists(path))
+        {
+            var bytes = await File.ReadAllBytesAsync(path);
+            var base64 = Convert.ToBase64String(bytes);
+            base64Image = $"data:image/jpeg;base64,{base64}";
+        }
+    }
+
+    private async Task DeletePic()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<GenericDialog> { { x => x.Text, "Willst du das Bild wirklich Löschen? Es kann nicht mehr hergestellt werden." }, {x => x.Header, "Löschen"}, {x => x.ButtonText, "Löschen"}, {x => x.CancelText, "Abbrechen"} };
+
+        var dialog = await DialogService.ShowAsync<GenericDialog>("",parameters, options);
+        var result = await dialog.Result;
+        
+        if(!result.Canceled)
+        {
+            RemovePic();
+        }
+    }
+
+    private async Task EditPic()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<EditPhotoItemDialog> { { x => x.ImageItem, Album.pictures.Where(x => x.url == RepoPath).FirstOrDefault() }, {x => x.Album, Album} };
+
+        var dialog = await DialogService.ShowAsync<EditPhotoItemDialog>("",parameters, options);
+        var result = await dialog.Result;
+    }
+    
+    private void RemovePic()
+    {
+        var path = Path.Combine(FileSystem.AppDataDirectory,"Repo","public", RepoPath);
+        try
+        { 
+            if(Album.pictures.Any(x => x.url == RepoPath))
+            {
+                var albumItem = JsonService.DeepCopy(Album);
+                albumItem.pictures = Album.pictures.Where(x => x.url != RepoPath).ToArray();
+                JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "alben.json"), Album, albumItem);
+            }
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                SnackBar.Add("Bild gelöscht", Severity.Success);
+            }
+            else
+            {
+                SnackBar.Add("Bild existiert nicht mehr", Severity.Error);
+            }
+        }catch (Exception e)
+        {
+            SnackBar.Add("Fehler beim Löschen des Bildes", Severity.Error);
+        }
+        
+    }
+}

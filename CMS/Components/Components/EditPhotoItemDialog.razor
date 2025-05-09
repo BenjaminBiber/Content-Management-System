@@ -1,0 +1,43 @@
+@using CMS.Services
+@using LibGit2Sharp
+@inject ISnackbar SnackBar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="imageItem.title" Label="Bildtitel"></MudTextField>
+        <MudCheckBox T="bool" @bind-Value="imageItem.isBest" Label="ist Best"></MudCheckBox>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitImage">Änderung speichern</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+    [Parameter] public ImageItem ImageItem { get; set; }
+    [Parameter] public AlbumItem Album { get; set; }
+    private ImageItem imageItem = new ImageItem();
+
+    protected override async Task OnInitializedAsync()
+    {
+        imageItem = JsonService.DeepCopy(ImageItem);
+    }
+
+    private void SubmitImage()
+    {   
+        var album = JsonService.DeepCopy(Album);
+        album.pictures = album.pictures.Where(x => x.url != imageItem.url).ToArray();
+        album.pictures = album.pictures.Append(imageItem).ToArray();
+        if (ImageItem != imageItem)
+        {
+            JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "alben.json"), Album, album);
+        }
+        Submit();
+    }
+    
+}

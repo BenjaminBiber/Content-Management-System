@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CMS.Services;
+using LibGit2Sharp;
+using Microsoft.Extensions.Logging;
+using MudBlazor.Services;
 
 namespace CMS;
 
@@ -12,6 +15,9 @@ public static class MauiProgram
             .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
 
         builder.Services.AddMauiBlazorWebView();
+        builder.Services.AddMudServices();
+        builder.Services.AddSingleton<SettingService>();
+        builder.Services.AddSingleton<GitService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
@@ -20,4 +26,5 @@ public static class MauiProgram
 
         return builder.Build();
     }
+
 }

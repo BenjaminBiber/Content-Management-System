@@ -1,0 +1,38 @@
+@using CMS.Services
+@using LibGit2Sharp
+@inject ISnackbar SnackBar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="textItem.value" Label="@textItem.description"></MudTextField>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitText" >Änderung speichern</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    [Parameter] public TextItem Text { get; set; }
+    private TextItem textItem = new TextItem();
+    
+    protected override void OnInitialized()
+    {
+        textItem = JsonService.DeepCopy(Text);
+    }
+    
+    private void SubmitText()
+    {
+        if (Text != textItem)
+        {
+            JsonService.UpdateItem(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "texts.json"), Text, textItem);
+        }
+        Submit();
+    }
+}

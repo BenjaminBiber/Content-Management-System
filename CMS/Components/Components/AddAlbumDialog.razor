@@ -1,0 +1,46 @@
+@using CMS.Services
+@using LibGit2Sharp
+@inject ISnackbar SnackBar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField Placeholder="Albumtitel eingeben:" @bind-Value="albumItem.name"></MudTextField>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAlbum">Änderung speichern</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+    private void Cancel() => MudDialog.Cancel();
+    
+    private AlbumItem albumItem = new AlbumItem();
+    
+    private async Task SubmitAlbum()
+    {
+        var albums = JsonService.GetItems<AlbumItem[]>(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "alben.json")).ToList();
+
+        if (albums.Any(x => x.name.Trim().ToLower() == albumItem.name.Trim().ToLower()))
+        {
+            SnackBar.Add("Album existiert bereits", Severity.Error);
+            return;
+        }
+        
+        var options = new DialogOptions { CloseOnEscapeKey = false, CloseButton = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true, NoHeader = false};
+        var parameters = new DialogParameters<GenericDialog> { { x => x.Text, "Willst du das Album wirklich speichern?" }, {x => x.Header, "Speichern"}, {x => x.ButtonText, "Speichern"}, {x => x.CancelText, "Abbrechen"} };
+
+        var dialog = await DialogService.ShowAsync<GenericDialog>("",parameters, options);
+        var result = await dialog.Result;
+        
+        if(!result.Canceled)
+        {
+            JsonService.AddItem(Path.Combine(FileSystem.AppDataDirectory, "Repo", "public", "data", "alben.json"), albumItem);
+            Submit(); 
+        }
+    }
+}
